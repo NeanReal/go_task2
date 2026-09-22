@@ -1,0 +1,55 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  check-and-test:
+    name: CI Checks
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Скачивание кода
+      - name: Checkout code
+        uses: actions/checkout@v4
+      # 2. Установка Go
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          check-latest: true
+      # 3. Проверка форматирования (gofmt)
+      - name: Check formatting (gofmt)
+        run: |
+          UNFORMATTED=$(gofmt -l .)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "Файлы не отформатированы по стандарту gofmt:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+      # 4. Проверка зависимостей (go mod verify и go mod tidy)
+      - name: Verify dependencies
+        run: |
+          go mod verify
+          go mod tidy
+          git diff --exit-code go.mod
+      # 5. Проверка на уязвимости (govulncheck)
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version: '1.23'
+      # 6. Статический анализ (go vet)
+      - name: Run go vet
+        run: go vet ./...
+      # 7. Сборка проекта (go build)
+      - name: Build project
+        run: go build -v ./...
+      # 8. Запуск Unit-тестов (go test)
+      - name: Run tests
+        run: go test -v -race ./...
