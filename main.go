@@ -8,37 +8,40 @@ import (
 	"time"
 )
 
-func main() {
-	http.HandleFunc("GET /api/calc", func(w http.ResponseWriter, r *http.Request) {
-		dateParam := r.URL.Query().Get("date")
+func setupRouter() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/calc", handleCalc)
+	return mux
+}
 
-		targetDate := time.Now()
-
-		if dateParam != "" {
-			parsed, err := time.Parse("2006-01-02", dateParam)
-			if err != nil {
-				http.Error(w, "Неверный формат даты. Ожидается YYYY-MM-DD", http.StatusBadRequest)
-				return
-			}
-			targetDate = parsed
-		}
-
-		days := calcDaysToNewYear(targetDate)
-
-		resp := TaskResponse{
-			Date:          targetDate,
-			Title:         "Дни до Нового года",
-			DaysToNewYear: days,
-		}
-
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		err := json.NewEncoder(w).Encode(resp)
+func handleCalc(w http.ResponseWriter, r *http.Request) {
+	dateParam := r.URL.Query().Get("date")
+	targetDate := time.Now()
+	if dateParam != "" {
+		parsed, err := time.Parse("2006-01-02", dateParam)
 		if err != nil {
-			log.Printf("Ошибка отправки JSON: %v", err)
+			http.Error(w, "Неверный формат даты. Ожидается YYYY-MM-DD", http.StatusBadRequest)
+			return
 		}
-	})
+		targetDate = parsed
+	}
+	days := calcDaysToNewYear(targetDate)
+	resp := TaskResponse{
+		Date:          targetDate,
+		Title:         "Дни до Нового года",
+		DaysToNewYear: days,
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	err := json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		log.Printf("Ошибка отправки JSON: %v", err)
+	}
+}
+
+func main() {
+	handler := setupRouter()
 	log.Println("Сервер работает на http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", handler))
 }
 
 // calcDaysToNewYear определяет количество календарных дней, оставшихся
