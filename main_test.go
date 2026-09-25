@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -48,6 +51,57 @@ func TestCalcDaysToNewYear(t *testing.T) {
 			result := calcDaysToNewYear(tt.input)
 			if result != tt.expected {
 				t.Errorf("%s: got %d, expected %d", tt.name, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCalcAPI(t *testing.T) {
+	ts := httptest.NewServer(setupRouter())
+	defer ts.Close()
+	tests := []struct {
+		name           string
+		urlPath        string
+		expectedStatus int
+		expectedDays   int
+	}{
+		{
+			name:           "Успешный расчет с датой",
+			urlPath:        "/api/calc?date=2026-12-25",
+			expectedStatus: http.StatusOK,
+			expectedDays:   7,
+		},
+		{
+			name:           "Некорректная дата",
+			urlPath:        "/api/calc?date=bad-date",
+			expectedStatus: http.StatusBadRequest,
+			expectedDays:   0, // при ошибке дни не проверяем
+		},
+		{
+			name:           "Без даты (по умолчанию)",
+			urlPath:        "/api/calc",
+			expectedStatus: http.StatusOK,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := ts.Client().Get(ts.URL + tt.urlPath)
+			if err != nil {
+				t.Fatalf("Ошибка запроса: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tt.expectedStatus {
+				t.Errorf("%s: got %d, expected %d", tt.name, resp.StatusCode, tt.expectedStatus)
+			}
+			if resp.StatusCode == http.StatusOK {
+				var data TaskResponse
+				err := json.NewDecoder(resp.Body).Decode(&data)
+				if err != nil {
+					t.Fatalf("Не удалось прочитать JSON: %v", err)
+				}
+				if tt.expectedDays > 0 && data.DaysToNewYear != tt.expectedDays {
+					t.Errorf("Неверное количество дней: получили %d, ожидали %d", data.DaysToNewYear, tt.expectedDays)
+				}
 			}
 		})
 	}
