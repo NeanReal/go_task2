@@ -1,3 +1,3 @@
-module task1
+module task2
 
 go 1.27
